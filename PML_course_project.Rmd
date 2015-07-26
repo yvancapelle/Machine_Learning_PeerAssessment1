@@ -1,0 +1,119 @@
+# **Practical Machine Learning : Course Project**
+
+## **Background**
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset). 
+
+##**Data**
+
+The training data for this project are available [here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv).
+
+The test data are available [here](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv).
+
+The data for this project come from this [source](http://groupware.les.inf.puc-rio.br/har).
+
+##**Data Predicting**
+
+The libraries need for the analysis.
+
+```{r, warning=FALSE, message=FALSE}
+library(caret)
+library(rattle)
+library(rpart.plot)
+```
+###**Getting Data**
+
+```{r}
+training <- read.csv("pml-training.csv",na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv("pml-testing.csv",na.strings=c("NA","#DIV/0!",""))
+```
+### **Preprocessing**
+
+Creation of two datasets for finding predicting models and testing its.
+
+```{r}
+inTrain <- createDataPartition(y=training$classe, p=0.6, list=FALSE)
+Training <- training[inTrain, ]; Testing <- training[-inTrain, ]
+```
+
+We eliminate the seven first columns because they're no use for predicting the outcome *classe* (ID, usernames,...) and we eliminate the variables with very low variation because they're no impact on the predicting model.
+
+```{r}
+Training <- Training[,- c(1:7)]
+nearzerovar <- nearZeroVar(Training, saveMetrics = TRUE)
+Training <- Training[, !nearzerovar$nzv]
+dim(Training)
+```
+
+We also eliminate variables with more than half of data with no entries.
+
+```{r}
+
+inf50 <- sapply(colnames(Training), function(x) if(sum(is.na(Training[, x])) > 0.50*nrow(Training))    {return(TRUE)}
+                else
+                        {
+return(FALSE)
+}
+)
+Training <- Training[, !inf50]
+dim(Training)
+```
+
+Only left  `r dim(Training)[2]` columns. 
+
+###**First predicting model : predicting tree**
+
+We create the model
+```{r}
+modFit1 <- train(classe ~ ., method = "rpart", data = Training)
+fancyRpartPlot(modFit1$finalModel, sub = "First model")
+```
+
+We make cross-validation.
+
+```{r}
+pred1 <- predict(modFit1, newdata = Testing)
+conf1 <- confusionMatrix(pred1, Testing$classe)
+```
+
+1. Look at the prediction table
+
+```{r}
+conf1$table
+```
+
+2. Look at the accuracy
+
+We have a accuracy of `r 100*round(conf1$overall[1], digits =3)`% with a confidence interval of [`r 100*round(conf1$overall[3], digits =3)`%,`r 100*round(conf1$overall[4], digits =3)`%]. It seems to be not a good accurate predicting model. Try a second one.
+
+###**Second predicting model : random forest**
+
+We create the model
+```{r, warning=FALSE, message=FALSE}
+modFit2 <- train(classe ~ ., method = "rf", data = Training, trControl = trainControl(method = "cv", number = 4), importance = TRUE)
+```
+
+We make cross-validation.
+
+```{r}
+pred2 <- predict(modFit2, newdata = Testing)
+conf2 <- confusionMatrix(pred2, Testing$classe)
+```
+
+1. Look at the prediction table
+
+```{r}
+conf2$table
+```
+
+2. Look at the accuracy
+
+We have a accuracy of `r 100*round(conf2$overall[1], digits =3)`% with a confidence interval of [`r 100*round(conf2$overall[3], digits =3)`%,`r 100*round(conf2$overall[4], digits =3)`%]. We have our model!!!
+
+##**Reference**
+
+Ugulino, W.; Cardador, D.; Vega, K.; Velloso, E.; Milidiu, R.; Fuks, H. Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements. Proceedings of 21st Brazilian Symposium on Artificial Intelligence. Advances in Artificial Intelligence 
+
+
+
+
